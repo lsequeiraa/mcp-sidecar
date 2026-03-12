@@ -1,0 +1,29 @@
+{
+  "name": "mcp-sidecar",
+  "version": "0.0.0",
+  "description": "Cross-platform MCP server for managing background processes",
+  "mcpName": "io.github.lsequeiraa/mcp-sidecar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lsequeiraa/mcp-sidecar"
+  },
+  "bin": {
+    "mcp-sidecar": "./run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "process-manager",
+    "background-process",
+    "sidecar"
+  ],
+  "files": [
+    "run.js",
+    "install.js",
+    "bin/"
+  ]
+}

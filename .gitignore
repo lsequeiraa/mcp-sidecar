@@ -15,6 +15,12 @@
 go.work
 go.work.sum
 
+# npm downloaded binaries
+npm/bin/
+
+# GoReleaser
+dist/
+
 # IDE
 .idea/
 .vscode/

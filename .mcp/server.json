@@ -1,0 +1,41 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.lsequeiraa/mcp-sidecar",
+  "title": "MCP Sidecar",
+  "description": "Cross-platform MCP server for managing background processes. Start, stop, and interact with long-lived processes from any MCP client.",
+  "repository": {
+    "url": "https://github.com/lsequeiraa/mcp-sidecar",
+    "source": "github"
+  },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "mcp-sidecar",
+      "version": "0.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "SIDECAR_MAX_PROCESSES",
+          "description": "Maximum number of concurrent managed processes (default: 10)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_BUFFER_SIZE",
+          "description": "Output buffer size per stream in bytes (default: 1048576)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_KILL_TIMEOUT",
+          "description": "Milliseconds to wait between graceful and forced termination (default: 5000)",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
