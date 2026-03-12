@@ -1,4 +1,4 @@
-package main
+package sidecar
 
 import (
 	"fmt"
@@ -136,14 +136,20 @@ func (p *Process) Stop(timeout time.Duration) error {
 	case <-time.After(timeout):
 	}
 
-	// Force kill.
-	if err := forceKill(pid); err != nil {
-		return fmt.Errorf("force kill pid %d: %w", pid, err)
-	}
+	// Force kill (best-effort; process may have already exited from graceful
+	// stop, making the PID invalid).
+	forceErr := forceKill(pid)
 
-	// Wait for the process to fully exit after force kill.
-	<-p.done
-	return nil
+	// Wait for the process to fully exit.
+	select {
+	case <-p.done:
+		return nil
+	case <-time.After(3 * time.Second):
+		if forceErr != nil {
+			return fmt.Errorf("force kill pid %d: %w", pid, forceErr)
+		}
+		return fmt.Errorf("process pid %d did not exit after force kill", pid)
+	}
 }
 
 // Send writes data to the process's stdin.

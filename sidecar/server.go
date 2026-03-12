@@ -1,4 +1,4 @@
-package main
+package sidecar
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// registerTools adds all MCP tools to the server and binds their handlers.
-func registerTools(s *server.MCPServer, mgr *Manager) {
+// RegisterTools adds all MCP tools to the server and binds their handlers.
+func RegisterTools(s *server.MCPServer, mgr ProcessManager) {
 	// -- start --
 	s.AddTool(
 		mcp.NewTool("start",
@@ -76,7 +76,7 @@ func registerTools(s *server.MCPServer, mgr *Manager) {
 
 // --- handlers ---
 
-func handleStart(mgr *Manager) server.ToolHandlerFunc {
+func handleStart(mgr ProcessManager) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		command, err := req.RequireString("command")
 		if err != nil {
@@ -109,7 +109,7 @@ func handleStart(mgr *Manager) server.ToolHandlerFunc {
 	}
 }
 
-func handleStop(mgr *Manager) server.ToolHandlerFunc {
+func handleStop(mgr ProcessManager) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		id, err := req.RequireString("id")
 		if err != nil {
@@ -128,7 +128,7 @@ func handleStop(mgr *Manager) server.ToolHandlerFunc {
 	}
 }
 
-func handleList(mgr *Manager) server.ToolHandlerFunc {
+func handleList(mgr ProcessManager) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		procs := mgr.List()
 		items := make([]map[string]any, len(procs))
@@ -145,7 +145,7 @@ func handleList(mgr *Manager) server.ToolHandlerFunc {
 	}
 }
 
-func handleOutput(mgr *Manager) server.ToolHandlerFunc {
+func handleOutput(mgr ProcessManager) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		id, err := req.RequireString("id")
 		if err != nil {
@@ -166,7 +166,7 @@ func handleOutput(mgr *Manager) server.ToolHandlerFunc {
 	}
 }
 
-func handleSend(mgr *Manager) server.ToolHandlerFunc {
+func handleSend(mgr ProcessManager) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		id, err := req.RequireString("id")
 		if err != nil {
@@ -191,7 +191,7 @@ func handleSend(mgr *Manager) server.ToolHandlerFunc {
 	}
 }
 
-func handleStatus(mgr *Manager) server.ToolHandlerFunc {
+func handleStatus(mgr ProcessManager) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		id, err := req.RequireString("id")
 		if err != nil {

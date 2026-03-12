@@ -6,12 +6,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/lsequeiraa/mcp-sidecar/sidecar"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
-	cfg := LoadConfig()
-	mgr := NewManager(cfg)
+	cfg := sidecar.LoadConfig()
+	mgr := sidecar.NewManager(cfg)
 
 	s := server.NewMCPServer(
 		"mcp-sidecar",
@@ -19,7 +20,7 @@ func main() {
 		server.WithToolCapabilities(true),
 	)
 
-	registerTools(s, mgr)
+	sidecar.RegisterTools(s, mgr)
 
 	// Clean up all child processes on SIGINT / SIGTERM.
 	sigCh := make(chan os.Signal, 1)

@@ -1,6 +1,6 @@
 //go:build windows
 
-package main
+package sidecar
 
 import (
 	"fmt"
@@ -21,9 +21,12 @@ func setSysProcAttr(cmd *exec.Cmd) {
 	}
 }
 
-// gracefulStop asks the process to terminate via taskkill (no /F).
+// gracefulStop asks the process and its children to terminate via taskkill
+// (no /F). The /T flag ensures the entire process tree receives the close
+// message, preventing orphaned children that would break a subsequent
+// force-kill by PID.
 func gracefulStop(pid int) error {
-	kill := exec.Command("taskkill", "/PID", fmt.Sprintf("%d", pid))
+	kill := exec.Command("taskkill", "/T", "/PID", fmt.Sprintf("%d", pid))
 	return kill.Run()
 }
 
