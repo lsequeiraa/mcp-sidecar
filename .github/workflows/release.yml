@@ -78,6 +78,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish main package
-        run: npm publish npm/mcp-sidecar --access public
+        run: npm publish ./npm/mcp-sidecar --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
