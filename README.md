@@ -221,7 +221,7 @@ The allowlist supports three matching modes:
 
 | Channel | Usage |
 |---|---|
-| **npm** | `npx -y mcp-sidecar` (downloads platform binary on install) |
+| **npm** | `npx -y mcp-sidecar` (platform binary via `@mcp-sidecar/*` optional packages) |
 | **GitHub Releases** | Pre-built binaries attached to each release |
 | **MCP Registry** | `io.github.lsequeiraa/mcp-sidecar` |
 
