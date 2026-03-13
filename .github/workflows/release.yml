@@ -30,20 +30,44 @@ jobs:
   npm-publish:
     needs: goreleaser
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: npm
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+      - name: Cross-compile binaries
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          GOOS=darwin  GOARCH=arm64 go build -o npm/@mcp-sidecar/darwin-arm64/bin/mcp-sidecar .
+          GOOS=darwin  GOARCH=amd64 go build -o npm/@mcp-sidecar/darwin-x64/bin/mcp-sidecar .
+          GOOS=linux   GOARCH=arm64 go build -o npm/@mcp-sidecar/linux-arm64/bin/mcp-sidecar .
+          GOOS=linux   GOARCH=amd64 go build -o npm/@mcp-sidecar/linux-x64/bin/mcp-sidecar .
+          GOOS=windows GOARCH=amd64 go build -o npm/@mcp-sidecar/win32-x64/mcp-sidecar.exe .
 
-      - run: npm publish --access public
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for dir in npm/mcp-sidecar npm/@mcp-sidecar/*/; do
+            npm version "$VERSION" --no-git-tag-version --allow-same-version --prefix "$dir"
+          done
+
+      - name: Publish platform packages
+        run: |
+          for dir in npm/@mcp-sidecar/*/; do
+            npm publish "$dir" --access public
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish main package
+        run: npm publish npm/mcp-sidecar --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

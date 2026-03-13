@@ -1,6 +1,6 @@
 {
   "name": "mcp-sidecar",
-  "version": "0.1.2",
+  "version": "0.0.0",
   "description": "Cross-platform MCP server for managing background processes",
   "mcpName": "io.github.lsequeiraa/mcp-sidecar",
   "license": "MIT",
@@ -9,10 +9,17 @@
     "url": "https://github.com/lsequeiraa/mcp-sidecar"
   },
   "bin": {
-    "mcp-sidecar": "./run.js"
+    "mcp-sidecar": "./bin.js"
   },
   "scripts": {
     "postinstall": "node install.js"
+  },
+  "optionalDependencies": {
+    "@mcp-sidecar/darwin-arm64": "0.0.0",
+    "@mcp-sidecar/darwin-x64": "0.0.0",
+    "@mcp-sidecar/linux-arm64": "0.0.0",
+    "@mcp-sidecar/linux-x64": "0.0.0",
+    "@mcp-sidecar/win32-x64": "0.0.0"
   },
   "keywords": [
     "mcp",
@@ -22,8 +29,7 @@
     "sidecar"
   ],
   "files": [
-    "run.js",
-    "install.js",
-    "bin/"
+    "bin.js",
+    "install.js"
   ]
 }

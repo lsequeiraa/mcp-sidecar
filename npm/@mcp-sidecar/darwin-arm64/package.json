@@ -1,0 +1,13 @@
+{
+  "name": "@mcp-sidecar/darwin-arm64",
+  "version": "0.0.0",
+  "description": "macOS ARM64 binary for mcp-sidecar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lsequeiraa/mcp-sidecar"
+  },
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "preferUnplugged": true
+}

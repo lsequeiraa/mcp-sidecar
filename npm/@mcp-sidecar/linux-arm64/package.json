@@ -1,0 +1,13 @@
+{
+  "name": "@mcp-sidecar/linux-arm64",
+  "version": "0.0.0",
+  "description": "Linux ARM64 binary for mcp-sidecar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lsequeiraa/mcp-sidecar"
+  },
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "preferUnplugged": true
+}

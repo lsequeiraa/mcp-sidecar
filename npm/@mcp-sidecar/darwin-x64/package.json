@@ -1,0 +1,13 @@
+{
+  "name": "@mcp-sidecar/darwin-x64",
+  "version": "0.0.0",
+  "description": "macOS x64 binary for mcp-sidecar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lsequeiraa/mcp-sidecar"
+  },
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "preferUnplugged": true
+}

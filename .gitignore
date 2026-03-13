@@ -15,8 +15,10 @@
 go.work
 go.work.sum
 
-# npm downloaded binaries
-npm/bin/
+# npm platform binaries (built by CI, never checked in)
+npm/@mcp-sidecar/*/bin/
+npm/@mcp-sidecar/win32-x64/mcp-sidecar.exe
+npm/mcp-sidecar/node_modules/
 
 # GoReleaser
 dist/
