@@ -58,6 +58,16 @@ jobs:
           for dir in npm/mcp-sidecar npm/@mcp-sidecar/*/; do
             npm version "$VERSION" --no-git-tag-version --allow-same-version --prefix "$dir"
           done
+          # Update optionalDependencies in the main package to match
+          node -e "
+            const fs = require('fs');
+            const p = 'npm/mcp-sidecar/package.json';
+            const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+            for (const dep of Object.keys(pkg.optionalDependencies || {})) {
+              pkg.optionalDependencies[dep] = '${VERSION}';
+            }
+            fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n');
+          "
 
       - name: Publish platform packages
         run: |
