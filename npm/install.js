@@ -67,11 +67,10 @@ function extractTarGz(buffer, destDir) {
 function extractZip(buffer, destDir) {
   const archive = path.join(destDir, "archive.zip");
   fs.writeFileSync(archive, buffer);
-  // PowerShell is available on all supported Windows versions.
-  execSync(
-    `powershell -NoProfile -Command "Expand-Archive -Force '${archive}' '${destDir}'"`,
-    { stdio: "ignore" }
-  );
+  // Use system tar which handles zip files on Windows 10+ without
+  // depending on PowerShell's Expand-Archive (which fails when the
+  // execution policy blocks script-based modules).
+  execSync(`tar -xf "${archive}" -C "${destDir}"`, { stdio: "ignore" });
   fs.unlinkSync(archive);
 }
 
