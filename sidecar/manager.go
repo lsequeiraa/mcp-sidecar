@@ -3,7 +3,9 @@ package sidecar
 import (
 	"crypto/rand"
 	"fmt"
+	"os/exec"
 	"sync"
+	"time"
 )
 
 // Manager tracks all managed processes and enforces limits.
@@ -11,17 +13,25 @@ type Manager struct {
 	mu        sync.RWMutex
 	processes map[string]*Process
 	config    *Config
+	security  *SecurityValidator
+	audit     *AuditLogger
 }
 
 // NewManager creates a process manager with the given configuration.
-func NewManager(config *Config) *Manager {
+// security and audit may be nil to disable those features.
+func NewManager(config *Config, security *SecurityValidator, audit *AuditLogger) *Manager {
 	return &Manager{
 		processes: make(map[string]*Process),
 		config:    config,
+		security:  security,
+		audit:     audit,
 	}
 }
 
 // Start spawns a new background process and registers it with the manager.
+// When security is enabled, the command is validated against the allowlist
+// and executed directly (no shell). Otherwise it is run through the
+// platform shell (sh -c / cmd /C).
 func (m *Manager) Start(command, name, cwd string, env map[string]string) (*Process, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -30,16 +40,34 @@ func (m *Manager) Start(command, name, cwd string, env map[string]string) (*Proc
 		return nil, fmt.Errorf("max processes reached (%d)", m.config.MaxProcesses)
 	}
 
+	// Security validation + command building.
+	var cmd *exec.Cmd
+	if m.security.IsEnabled() {
+		if err := m.security.ValidateCommand(command); err != nil {
+			m.audit.LogBlocked(command, err.Error())
+			return nil, fmt.Errorf("security: %w", err)
+		}
+		directCmd, err := m.security.BuildCommand(command)
+		if err != nil {
+			return nil, fmt.Errorf("security: %w", err)
+		}
+		cmd = directCmd
+	} else {
+		cmd = buildCommand(command)
+	}
+
 	id := generateID()
 
 	if name == "" {
 		name = id
 	}
 
-	p, err := newProcess(id, name, command, cwd, env, m.config.BufferSize)
+	p, err := newProcess(id, name, command, cwd, env, m.config.BufferSize, cmd)
 	if err != nil {
 		return nil, err
 	}
+
+	m.audit.LogStart(id, command, cwd)
 
 	m.processes[id] = p
 	return p, nil
@@ -52,11 +80,11 @@ func (m *Manager) Stop(id string) (*Process, error) {
 		return nil, err
 	}
 
-	if err := p.Stop(m.config.KillTimeout); err != nil {
-		return p, err
-	}
+	start := time.Now()
+	stopErr := p.Stop(m.config.KillTimeout)
+	m.audit.LogStop(id, p.ExitCode, time.Since(start))
 
-	return p, nil
+	return p, stopErr
 }
 
 // List returns all managed processes (running and finished).
@@ -97,7 +125,9 @@ func (m *Manager) StopAll() {
 		wg.Add(1)
 		go func(proc *Process) {
 			defer wg.Done()
+			start := time.Now()
 			_ = proc.Stop(m.config.KillTimeout)
+			m.audit.LogStop(proc.ID, proc.ExitCode, time.Since(start))
 		}(p)
 	}
 	wg.Wait()

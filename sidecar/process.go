@@ -39,11 +39,11 @@ type Process struct {
 	done   chan struct{}
 }
 
-// newProcess creates, configures, and starts a child process. It wires
-// stdout and stderr into LineBuffers and launches a goroutine to wait for
-// the process to exit.
-func newProcess(id, name, command, cwd string, env map[string]string, bufSize int) (*Process, error) {
-	cmd := buildCommand(command)
+// newProcess configures and starts a child process using the provided
+// exec.Cmd. It wires stdout and stderr into LineBuffers and launches a
+// goroutine to wait for the process to exit. The caller is responsible
+// for constructing cmd (shell-wrapped or direct exec).
+func newProcess(id, name, command, cwd string, env map[string]string, bufSize int, cmd *exec.Cmd) (*Process, error) {
 	setSysProcAttr(cmd)
 
 	if cwd != "" {

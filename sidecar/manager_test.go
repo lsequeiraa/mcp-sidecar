@@ -40,7 +40,7 @@ func TestGenerateID_Unique(t *testing.T) {
 
 func TestNewManager(t *testing.T) {
 	cfg := &Config{MaxProcesses: 5, BufferSize: 1024, KillTimeout: 3 * time.Second}
-	mgr := NewManager(cfg)
+	mgr := NewManager(cfg, nil, nil)
 
 	if mgr.config != cfg {
 		t.Error("NewManager did not store config")
@@ -55,7 +55,7 @@ func TestNewManager(t *testing.T) {
 
 func TestManager_Get_NotFound(t *testing.T) {
 	cfg := &Config{MaxProcesses: 5, BufferSize: 1024, KillTimeout: 3 * time.Second}
-	mgr := NewManager(cfg)
+	mgr := NewManager(cfg, nil, nil)
 
 	_, err := mgr.Get("nonexistent")
 	if err == nil {
@@ -68,7 +68,7 @@ func TestManager_Get_NotFound(t *testing.T) {
 
 func TestManager_Get_Found(t *testing.T) {
 	cfg := &Config{MaxProcesses: 5, BufferSize: 1024, KillTimeout: 3 * time.Second}
-	mgr := NewManager(cfg)
+	mgr := NewManager(cfg, nil, nil)
 
 	// Inject a process directly.
 	p := &Process{ID: "sc-test1", Name: "test", State: StateRunning}
@@ -85,7 +85,7 @@ func TestManager_Get_Found(t *testing.T) {
 
 func TestManager_List_Empty(t *testing.T) {
 	cfg := &Config{MaxProcesses: 5, BufferSize: 1024, KillTimeout: 3 * time.Second}
-	mgr := NewManager(cfg)
+	mgr := NewManager(cfg, nil, nil)
 
 	procs := mgr.List()
 	if len(procs) != 0 {
@@ -95,7 +95,7 @@ func TestManager_List_Empty(t *testing.T) {
 
 func TestManager_List_WithProcesses(t *testing.T) {
 	cfg := &Config{MaxProcesses: 5, BufferSize: 1024, KillTimeout: 3 * time.Second}
-	mgr := NewManager(cfg)
+	mgr := NewManager(cfg, nil, nil)
 
 	mgr.processes["sc-a"] = &Process{ID: "sc-a", Name: "a", State: StateRunning}
 	mgr.processes["sc-b"] = &Process{ID: "sc-b", Name: "b", State: StateExited}
