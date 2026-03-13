@@ -67,10 +67,12 @@ function extractTarGz(buffer, destDir) {
 function extractZip(buffer, destDir) {
   const archive = path.join(destDir, "archive.zip");
   fs.writeFileSync(archive, buffer);
-  // Use system tar which handles zip files on Windows 10+ without
-  // depending on PowerShell's Expand-Archive (which fails when the
-  // execution policy blocks script-based modules).
-  execSync(`tar -xf "${archive}" -C "${destDir}"`, { stdio: "ignore" });
+  // Use the Windows system tar.exe (bsdtar) which supports zip format.
+  // Cannot rely on bare "tar" because Git's GNU tar may appear first
+  // in PATH and does not handle zip archives.
+  const sysRoot = process.env.SystemRoot || path.join("C:", "Windows");
+  const tar = path.join(sysRoot, "System32", "tar.exe");
+  execSync(`"${tar}" -xf "${archive}" -C "${destDir}"`, { stdio: "ignore" });
   fs.unlinkSync(archive);
 }
 
