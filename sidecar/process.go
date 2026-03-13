@@ -28,6 +28,7 @@ type Process struct {
 	State     ProcessState
 	ExitCode  int
 	StartTime time.Time
+	EndTime   time.Time // zero while running; set when process exits
 
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
@@ -99,6 +100,8 @@ func (p *Process) waitForExit() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	p.EndTime = time.Now()
+
 	if p.killed {
 		p.State = StateKilled
 	} else if err != nil {
@@ -165,8 +168,17 @@ func (p *Process) Send(input string) error {
 	return err
 }
 
-// Uptime returns how long the process has been (or was) alive.
+// Uptime returns how long the process has been running. For processes that
+// have exited, it returns the actual runtime (EndTime - StartTime) rather
+// than the time since start.
 func (p *Process) Uptime() time.Duration {
+	p.mu.Lock()
+	end := p.EndTime
+	p.mu.Unlock()
+
+	if !end.IsZero() {
+		return end.Sub(p.StartTime).Truncate(time.Second)
+	}
 	return time.Since(p.StartTime).Truncate(time.Second)
 }
 

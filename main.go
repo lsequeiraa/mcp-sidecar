@@ -27,6 +27,7 @@ func main() {
 
 	defer func() {
 		mgr.StopAll()
+		mgr.Close()
 		if audit != nil {
 			audit.Close()
 		}
@@ -38,7 +39,7 @@ func main() {
 		server.WithToolCapabilities(true),
 	)
 
-	sidecar.RegisterTools(s, mgr)
+	sidecar.RegisterTools(s, mgr, cfg)
 
 	// Clean up all child processes on SIGINT / SIGTERM.
 	// Note: os.Exit does not run deferred functions, so we must
@@ -49,6 +50,7 @@ func main() {
 	go func() {
 		<-sigCh
 		mgr.StopAll()
+		mgr.Close()
 		if audit != nil {
 			audit.Close()
 		}

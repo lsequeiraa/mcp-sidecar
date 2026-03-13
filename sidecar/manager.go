@@ -10,22 +10,33 @@ import (
 
 // Manager tracks all managed processes and enforces limits.
 type Manager struct {
-	mu        sync.RWMutex
-	processes map[string]*Process
-	config    *Config
-	security  *SecurityValidator
-	audit     *AuditLogger
+	mu          sync.RWMutex
+	processes   map[string]*Process
+	config      *Config
+	security    *SecurityValidator
+	audit       *AuditLogger
+	cleanupOnce sync.Once     // ensures Close only fires once
+	cleanupDone chan struct{} // closed to stop the cleanup goroutine
 }
 
 // NewManager creates a process manager with the given configuration.
 // security and audit may be nil to disable those features.
+// If CleanupAfter > 0, a background goroutine periodically removes
+// exited processes; call Close to stop it.
 func NewManager(config *Config, security *SecurityValidator, audit *AuditLogger) *Manager {
-	return &Manager{
+	m := &Manager{
 		processes: make(map[string]*Process),
 		config:    config,
 		security:  security,
 		audit:     audit,
 	}
+
+	if config.CleanupAfter > 0 {
+		m.cleanupDone = make(chan struct{})
+		m.startCleanup()
+	}
+
+	return m
 }
 
 // Start spawns a new background process and registers it with the manager.
@@ -131,6 +142,58 @@ func (m *Manager) StopAll() {
 		}(p)
 	}
 	wg.Wait()
+}
+
+// Close stops the cleanup goroutine if one is running. It is safe to call
+// multiple times.
+func (m *Manager) Close() {
+	m.cleanupOnce.Do(func() {
+		if m.cleanupDone != nil {
+			close(m.cleanupDone)
+		}
+	})
+}
+
+// startCleanup launches a background goroutine that periodically removes
+// exited processes whose EndTime is older than CleanupAfter.
+func (m *Manager) startCleanup() {
+	interval := m.config.CleanupAfter
+	if interval > 60*time.Second {
+		interval = 60 * time.Second
+	}
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				m.cleanupExpired()
+			case <-m.cleanupDone:
+				return
+			}
+		}
+	}()
+}
+
+// cleanupExpired removes processes that have exited and whose EndTime is
+// older than the configured CleanupAfter duration.
+func (m *Manager) cleanupExpired() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := time.Now()
+	for id, p := range m.processes {
+		p.mu.Lock()
+		expired := p.State != StateRunning &&
+			!p.EndTime.IsZero() &&
+			now.Sub(p.EndTime) > m.config.CleanupAfter
+		p.mu.Unlock()
+
+		if expired {
+			delete(m.processes, id)
+		}
+	}
 }
 
 // generateID produces a short random identifier like "sc-a1b2c3".

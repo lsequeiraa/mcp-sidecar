@@ -10,6 +10,8 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	t.Setenv("SIDECAR_MAX_PROCESSES", "")
 	t.Setenv("SIDECAR_BUFFER_SIZE", "")
 	t.Setenv("SIDECAR_KILL_TIMEOUT", "")
+	t.Setenv("SIDECAR_CLEANUP_AFTER", "")
+	t.Setenv("SIDECAR_MAX_OUTPUT_SIZE", "")
 
 	// Unset by clearing (Setenv to "" then unset via lookup behavior).
 	// envInt checks os.LookupEnv, which returns ok=true for empty string,
@@ -26,12 +28,20 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	if cfg.KillTimeout != time.Duration(defaultKillTimeout)*time.Millisecond {
 		t.Errorf("KillTimeout = %v, want %v", cfg.KillTimeout, time.Duration(defaultKillTimeout)*time.Millisecond)
 	}
+	if cfg.CleanupAfter != time.Duration(defaultCleanupAfter)*time.Second {
+		t.Errorf("CleanupAfter = %v, want %v", cfg.CleanupAfter, time.Duration(defaultCleanupAfter)*time.Second)
+	}
+	if cfg.MaxOutputSize != 0 {
+		t.Errorf("MaxOutputSize = %d, want 0", cfg.MaxOutputSize)
+	}
 }
 
 func TestLoadConfig_CustomValues(t *testing.T) {
 	t.Setenv("SIDECAR_MAX_PROCESSES", "20")
 	t.Setenv("SIDECAR_BUFFER_SIZE", "2048")
 	t.Setenv("SIDECAR_KILL_TIMEOUT", "10000")
+	t.Setenv("SIDECAR_CLEANUP_AFTER", "60")
+	t.Setenv("SIDECAR_MAX_OUTPUT_SIZE", "524288")
 
 	cfg := LoadConfig()
 
@@ -43,6 +53,22 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	}
 	if cfg.KillTimeout != 10*time.Second {
 		t.Errorf("KillTimeout = %v, want 10s", cfg.KillTimeout)
+	}
+	if cfg.CleanupAfter != 60*time.Second {
+		t.Errorf("CleanupAfter = %v, want 60s", cfg.CleanupAfter)
+	}
+	if cfg.MaxOutputSize != 524288 {
+		t.Errorf("MaxOutputSize = %d, want 524288", cfg.MaxOutputSize)
+	}
+}
+
+func TestLoadConfig_CleanupDisabled(t *testing.T) {
+	t.Setenv("SIDECAR_CLEANUP_AFTER", "0")
+
+	cfg := LoadConfig()
+
+	if cfg.CleanupAfter != 0 {
+		t.Errorf("CleanupAfter = %v, want 0 (disabled)", cfg.CleanupAfter)
 	}
 }
 

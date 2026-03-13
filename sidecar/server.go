@@ -11,7 +11,8 @@ import (
 )
 
 // RegisterTools adds all MCP tools to the server and binds their handlers.
-func RegisterTools(s *server.MCPServer, mgr ProcessManager) {
+// cfg is used to read global limits such as MaxOutputSize.
+func RegisterTools(s *server.MCPServer, mgr ProcessManager, cfg *Config) {
 	// -- start --
 	s.AddTool(
 		mcp.NewTool("start",
@@ -50,8 +51,9 @@ func RegisterTools(s *server.MCPServer, mgr ProcessManager) {
 			mcp.WithDescription("Get buffered stdout and stderr of a process"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Process ID")),
 			mcp.WithNumber("tail", mcp.Description("Return only the last N lines (0 = all)")),
+			mcp.WithNumber("maxBytes", mcp.Description("Max total bytes for stdout+stderr combined (0 = unlimited). Keeps the most recent output. Stderr is prioritized.")),
 		),
-		handleOutput(mgr),
+		handleOutput(mgr, cfg),
 	)
 
 	// -- send --
@@ -124,6 +126,7 @@ func handleStop(mgr ProcessManager) server.ToolHandlerFunc {
 		return jsonResult(map[string]any{
 			"id":       p.ID,
 			"exitCode": p.ExitCode,
+			"uptime":   p.Uptime().String(),
 		})
 	}
 }
@@ -145,7 +148,7 @@ func handleList(mgr ProcessManager) server.ToolHandlerFunc {
 	}
 }
 
-func handleOutput(mgr ProcessManager) server.ToolHandlerFunc {
+func handleOutput(mgr ProcessManager, cfg *Config) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		id, err := req.RequireString("id")
 		if err != nil {
@@ -153,16 +156,36 @@ func handleOutput(mgr ProcessManager) server.ToolHandlerFunc {
 		}
 
 		tail := req.GetInt("tail", 0)
+		reqMax := req.GetInt("maxBytes", 0)
 
 		p, err := mgr.Get(id)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		return jsonResult(map[string]any{
-			"stdout": strings.Join(p.Stdout.Lines(tail), "\n"),
-			"stderr": strings.Join(p.Stderr.Lines(tail), "\n"),
-		})
+		stdoutStr := strings.Join(p.Stdout.Lines(tail), "\n")
+		stderrStr := strings.Join(p.Stderr.Lines(tail), "\n")
+
+		limit := effectiveLimit(cfg.MaxOutputSize, reqMax)
+
+		result := map[string]any{
+			"uptime": p.Uptime().String(),
+		}
+
+		if limit > 0 {
+			stdoutOut, stderrOut, total, truncated := truncateOutput(stdoutStr, stderrStr, limit)
+			result["stdout"] = stdoutOut
+			result["stderr"] = stderrOut
+			if truncated {
+				result["truncated"] = true
+				result["totalBytes"] = total
+			}
+		} else {
+			result["stdout"] = stdoutStr
+			result["stderr"] = stderrStr
+		}
+
+		return jsonResult(result)
 	}
 }
 
@@ -222,4 +245,68 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 		return mcp.NewToolResultError(fmt.Sprintf("json marshal: %v", err)), nil
 	}
 	return mcp.NewToolResultText(string(b)), nil
+}
+
+// effectiveLimit returns the active byte cap given a global config value and
+// a per-request value. Zero means unlimited; when both are set the smaller
+// non-zero value wins.
+func effectiveLimit(global, request int) int {
+	switch {
+	case global > 0 && request > 0:
+		if global < request {
+			return global
+		}
+		return request
+	case global > 0:
+		return global
+	default:
+		return request
+	}
+}
+
+// truncateOutput caps the combined size of stdout and stderr to maxBytes.
+// When truncation is needed, stderr is prioritized (it usually contains
+// error information). Each field keeps its most recent content (tail) and
+// is cut on a newline boundary to avoid partial lines.
+// Returns the (possibly truncated) stdout, stderr, total original bytes,
+// and whether truncation occurred.
+func truncateOutput(stdout, stderr string, maxBytes int) (string, string, int, bool) {
+	total := len(stdout) + len(stderr)
+	if total <= maxBytes {
+		return stdout, stderr, total, false
+	}
+
+	half := maxBytes / 2
+
+	switch {
+	case len(stderr) <= half:
+		// stderr fits in half; give stdout the remainder.
+		stdout = keepTail(stdout, maxBytes-len(stderr))
+	case len(stdout) <= half:
+		// stdout fits in half; give stderr the remainder.
+		stderr = keepTail(stderr, maxBytes-len(stdout))
+	default:
+		// Both exceed half; split evenly (stderr gets the rounding byte).
+		stdout = keepTail(stdout, half)
+		stderr = keepTail(stderr, maxBytes-half)
+	}
+
+	return stdout, stderr, total, true
+}
+
+// keepTail returns the last maxBytes of s, cutting at the first newline
+// after the cut point to avoid returning partial lines. If s already fits,
+// it is returned unchanged.
+func keepTail(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+	truncated := s[len(s)-maxBytes:]
+	if idx := strings.Index(truncated, "\n"); idx != -1 {
+		return truncated[idx+1:]
+	}
+	return truncated
 }

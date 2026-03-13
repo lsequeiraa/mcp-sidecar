@@ -19,9 +19,11 @@ import (
 // testConfig returns a Config suitable for integration tests.
 func testConfig() *Config {
 	return &Config{
-		MaxProcesses: 5,
-		BufferSize:   1024 * 1024, // 1 MB
-		KillTimeout:  5 * time.Second,
+		MaxProcesses:  5,
+		BufferSize:    1024 * 1024, // 1 MB
+		KillTimeout:   5 * time.Second,
+		CleanupAfter:  0, // disabled in tests
+		MaxOutputSize: 0, // unlimited in tests
 	}
 }
 
@@ -256,8 +258,9 @@ func TestIntegration_MCP_RoundTrip(t *testing.T) {
 	mgr := NewManager(testConfig(), nil, nil)
 	t.Cleanup(func() { mgr.StopAll() })
 
+	cfg := testConfig()
 	s := server.NewMCPServer("test-sidecar", "0.1.0", server.WithToolCapabilities(true))
-	RegisterTools(s, mgr)
+	RegisterTools(s, mgr, cfg)
 
 	c, err := client.NewInProcessClient(s)
 	if err != nil {
@@ -604,12 +607,13 @@ func TestIntegration_MCP_SecureMode_Blocked(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	cfg := testConfig()
 	sec := &SecurityValidator{allowedExecutables: []string{"git"}}
-	mgr := NewManager(testConfig(), sec, nil)
+	mgr := NewManager(cfg, sec, nil)
 	t.Cleanup(func() { mgr.StopAll() })
 
 	s := server.NewMCPServer("test-sidecar", "0.1.0", server.WithToolCapabilities(true))
-	RegisterTools(s, mgr)
+	RegisterTools(s, mgr, cfg)
 
 	c, err := client.NewInProcessClient(s)
 	if err != nil {
@@ -660,13 +664,14 @@ func TestIntegration_MCP_SecureMode_Allowed(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	cfg := testConfig()
 	exe, command := secureEchoCommand()
 	sec := &SecurityValidator{allowedExecutables: []string{exe}}
-	mgr := NewManager(testConfig(), sec, nil)
+	mgr := NewManager(cfg, sec, nil)
 	t.Cleanup(func() { mgr.StopAll() })
 
 	s := server.NewMCPServer("test-sidecar", "0.1.0", server.WithToolCapabilities(true))
-	RegisterTools(s, mgr)
+	RegisterTools(s, mgr, cfg)
 
 	c, err := client.NewInProcessClient(s)
 	if err != nil {

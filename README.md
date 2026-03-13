@@ -17,7 +17,8 @@ AI coding agents (Claude Code, Gemini CLI, Cursor, etc.) lack the ability to run
 - **Cross-platform** -- Windows, Linux, macOS from a single codebase
 - **Zero dependencies** -- Single Go binary, no runtime required
 - **Minimal surface** -- 6 tools, no unnecessary complexity
-- **Reliable cleanup** -- All child processes are terminated when the server exits
+- **Reliable cleanup** -- All child processes are terminated when the server exits; exited processes are auto-removed after a configurable TTL
+- **Output control** -- Per-request `maxBytes` and global `SIDECAR_MAX_OUTPUT_SIZE` to cap output returned to the LLM
 - **Command security** -- Optional executable allowlist, blocked patterns, and audit logging
 
 ## Installation
@@ -86,11 +87,15 @@ Pre-built binaries are also available on [GitHub Releases](https://github.com/ls
 | Tool | Description | Parameters | Returns |
 |---|---|---|---|
 | `start` | Spawn a background process | `command`, `name?`, `cwd?`, `env?` | `{ id, name, pid }` |
-| `stop` | Terminate a process (graceful, then force) | `id` | `{ id, exitCode }` |
+| `stop` | Terminate a process (graceful, then force) | `id` | `{ id, exitCode, uptime }` |
 | `list` | List all managed processes | -- | `[{ id, name, pid, state, uptime }]` |
-| `output` | Get buffered stdout/stderr | `id`, `tail?` | `{ stdout, stderr }` |
+| `output` | Get buffered stdout/stderr | `id`, `tail?`, `maxBytes?` | `{ stdout, stderr, uptime }` |
 | `send` | Write to a process's stdin | `id`, `input` | `{ ok }` |
 | `status` | Get detailed state of one process | `id` | `{ id, name, pid, state, exitCode, uptime, outputSize }` |
+
+The `uptime` field reflects actual runtime: for running processes it's the time since start; for exited processes it's the time the process was alive (not the time since start).
+
+The `output` tool's `maxBytes` parameter caps the total bytes of stdout+stderr combined. When both `tail` and `maxBytes` are provided, `tail` selects lines first, then `maxBytes` caps the byte size of the result. When the output exceeds the limit, the most recent content is kept and stderr is prioritized. Truncation preserves line boundaries. When output is truncated, the response includes `"truncated": true` and `"totalBytes"` indicating the original size.
 
 ### Process States
 
@@ -101,6 +106,28 @@ Pre-built binaries are also available on [GitHub Releases](https://github.com/ls
 | `failed` | Process terminated with non-zero exit code |
 | `killed` | Process was stopped via the `stop` tool |
 
+### Example workflow
+
+A typical session where an agent starts an API server, waits for it to be ready, tests it, and tears it down:
+
+```
+1. start  { command: "dotnet run --project MyApi", name: "api" }
+   → { id: "sc-a1b2c3", name: "api", pid: 12345 }
+
+2. output { id: "sc-a1b2c3", tail: 5 }
+   → { stdout: "Now listening on: http://localhost:5000", stderr: "", uptime: "3s" }
+
+3. (agent runs curl http://localhost:5000/health using its own shell)
+
+4. output { id: "sc-a1b2c3", tail: 20 }
+   → { stdout: "...request logs...", stderr: "", uptime: "15s" }
+
+5. stop   { id: "sc-a1b2c3" }
+   → { id: "sc-a1b2c3", exitCode: -1, uptime: "18s" }
+```
+
+The agent uses its native shell for short-lived commands (curl, build tools, etc.) and `mcp-sidecar` for processes that need to stay alive across multiple tool calls.
+
 ## Configuration
 
 All configuration is via environment variables (all optional):
@@ -110,9 +137,13 @@ All configuration is via environment variables (all optional):
 | `SIDECAR_MAX_PROCESSES` | `10` | Maximum concurrent processes |
 | `SIDECAR_BUFFER_SIZE` | `1048576` (1MB) | Output buffer size per process in bytes |
 | `SIDECAR_KILL_TIMEOUT` | `5000` | Milliseconds to wait between SIGTERM and SIGKILL |
+| `SIDECAR_CLEANUP_AFTER` | `1800` (30 min) | Seconds before exited processes are auto-removed. `0` = disabled |
+| `SIDECAR_MAX_OUTPUT_SIZE` | `0` (unlimited) | Global cap on bytes returned by the `output` tool. `0` = no limit |
 | `SIDECAR_ALLOWED_EXECUTABLES` | -- | Comma-separated allowlist of executables (enables secure mode) |
 | `SIDECAR_BLOCKED_PATTERNS` | -- | Comma-separated regex patterns to reject commands |
 | `SIDECAR_AUDIT_LOG` | -- | Audit log directory, or `true` (cwd) / `temp` (OS temp dir) |
+
+**Auto-cleanup note:** When `SIDECAR_CLEANUP_AFTER` is enabled (the default), exited processes are removed from the manager after the TTL expires. Once removed, calls to `output`, `status`, or `stop` for that process ID will return "not found". Retrieve any output you need within the TTL window (30 minutes by default).
 
 ## Security
 

@@ -313,7 +313,7 @@ func TestHandleOutput_Success(t *testing.T) {
 		getFn: func(id string) (*Process, error) { return p, nil },
 	}
 
-	handler := handleOutput(mock)
+	handler := handleOutput(mock, &Config{})
 	req := callToolRequest("output", map[string]any{"id": "sc-out1", "tail": float64(2)})
 
 	result, err := handler(context.Background(), req)
@@ -342,7 +342,7 @@ func TestHandleOutput_AllLines(t *testing.T) {
 		getFn: func(id string) (*Process, error) { return p, nil },
 	}
 
-	handler := handleOutput(mock)
+	handler := handleOutput(mock, &Config{})
 	req := callToolRequest("output", map[string]any{"id": "sc-out2"}) // no tail
 
 	result, err := handler(context.Background(), req)
@@ -492,7 +492,7 @@ func TestHandleOutput_MissingID(t *testing.T) {
 		},
 	}
 
-	handler := handleOutput(mock)
+	handler := handleOutput(mock, &Config{})
 	req := callToolRequest("output", map[string]any{})
 
 	result, err := handler(context.Background(), req)
@@ -561,5 +561,319 @@ func TestHandleStatus_MissingID(t *testing.T) {
 	}
 	if !result.IsError {
 		t.Error("expected error result for missing id")
+	}
+}
+
+// --- output tool uptime field ---
+
+func TestHandleOutput_IncludesUptime(t *testing.T) {
+	p := newTestProcess("sc-up1", "uptime-test", StateRunning)
+	p.Stdout.Write([]byte("data\n"))
+
+	mock := &mockManager{
+		getFn: func(id string) (*Process, error) { return p, nil },
+	}
+
+	handler := handleOutput(mock, &Config{})
+	req := callToolRequest("output", map[string]any{"id": "sc-up1"})
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	var got map[string]any
+	resultJSON(t, result, &got)
+	if got["uptime"] == nil {
+		t.Error("output response should include 'uptime' field")
+	}
+}
+
+// --- stop tool uptime field ---
+
+func TestHandleStop_IncludesUptime(t *testing.T) {
+	p := newTestProcess("sc-stop-up", "stop-uptime", StateKilled)
+	p.ExitCode = -1
+	p.EndTime = p.StartTime.Add(5 * time.Second)
+
+	mock := &mockManager{
+		stopFn: func(id string) (*Process, error) { return p, nil },
+	}
+
+	handler := handleStop(mock)
+	req := callToolRequest("stop", map[string]any{"id": "sc-stop-up"})
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	var got map[string]any
+	resultJSON(t, result, &got)
+	if got["uptime"] == nil {
+		t.Error("stop response should include 'uptime' field")
+	}
+}
+
+// --- effectiveLimit ---
+
+func TestEffectiveLimit(t *testing.T) {
+	tests := []struct {
+		name    string
+		global  int
+		request int
+		want    int
+	}{
+		{"both zero", 0, 0, 0},
+		{"global only", 1000, 0, 1000},
+		{"request only", 0, 500, 500},
+		{"both set, global smaller", 500, 1000, 500},
+		{"both set, request smaller", 1000, 500, 500},
+		{"both set, equal", 500, 500, 500},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := effectiveLimit(tt.global, tt.request)
+			if got != tt.want {
+				t.Errorf("effectiveLimit(%d, %d) = %d, want %d", tt.global, tt.request, got, tt.want)
+			}
+		})
+	}
+}
+
+// --- keepTail ---
+
+func TestKeepTail(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxBytes int
+		want     string
+	}{
+		{"fits entirely", "abc", 10, "abc"},
+		{"exact fit", "abc", 3, "abc"},
+		{"truncates on newline", "line1\nline2\nline3", 12, "line2\nline3"},
+		{"no newline in tail", "abcdefghij", 5, "fghij"},
+		{"zero maxBytes", "abc", 0, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := keepTail(tt.input, tt.maxBytes)
+			if got != tt.want {
+				t.Errorf("keepTail(%q, %d) = %q, want %q", tt.input, tt.maxBytes, got, tt.want)
+			}
+		})
+	}
+}
+
+// --- truncateOutput ---
+
+func TestTruncateOutput_NoTruncation(t *testing.T) {
+	stdout, stderr, total, truncated := truncateOutput("hello", "err", 100)
+
+	if truncated {
+		t.Error("should not be truncated")
+	}
+	if stdout != "hello" {
+		t.Errorf("stdout = %q, want 'hello'", stdout)
+	}
+	if stderr != "err" {
+		t.Errorf("stderr = %q, want 'err'", stderr)
+	}
+	if total != 8 {
+		t.Errorf("total = %d, want 8", total)
+	}
+}
+
+func TestTruncateOutput_StderrSmall_StdoutTruncated(t *testing.T) {
+	// stderr is small (3 bytes), fits in half of 20 (10).
+	// stdout gets remainder: 20 - 3 = 17 bytes.
+	stdout := "line1\nline2\nline3\nline4\nline5" // 29 bytes
+	stderr := "err"                               // 3 bytes
+	outStdout, outStderr, total, truncated := truncateOutput(stdout, stderr, 20)
+
+	if !truncated {
+		t.Error("should be truncated")
+	}
+	if total != 32 {
+		t.Errorf("total = %d, want 32", total)
+	}
+	if outStderr != "err" {
+		t.Errorf("stderr should be unchanged, got %q", outStderr)
+	}
+	if len(outStdout) > 17 {
+		t.Errorf("stdout should be <= 17 bytes, got %d bytes: %q", len(outStdout), outStdout)
+	}
+}
+
+func TestTruncateOutput_StdoutSmall_StderrTruncated(t *testing.T) {
+	stdout := "ok"                                     // 2 bytes
+	stderr := "error1\nerror2\nerror3\nerror4\nerror5" // 34 bytes
+	outStdout, outStderr, total, truncated := truncateOutput(stdout, stderr, 20)
+
+	if !truncated {
+		t.Error("should be truncated")
+	}
+	if total != 36 {
+		t.Errorf("total = %d, want 36", total)
+	}
+	if outStdout != "ok" {
+		t.Errorf("stdout should be unchanged, got %q", outStdout)
+	}
+	// stderr budget = 20 - 2 = 18
+	if len(outStderr) > 18 {
+		t.Errorf("stderr should be <= 18 bytes, got %d bytes: %q", len(outStderr), outStderr)
+	}
+}
+
+func TestTruncateOutput_BothExceedHalf(t *testing.T) {
+	stdout := "aaaaaaaaaa\nbbbbbbbbbb" // 21 bytes
+	stderr := "cccccccccc\ndddddddddd" // 21 bytes
+	outStdout, outStderr, total, truncated := truncateOutput(stdout, stderr, 20)
+
+	if !truncated {
+		t.Error("should be truncated")
+	}
+	if total != 42 {
+		t.Errorf("total = %d, want 42", total)
+	}
+	// Each gets ~10 bytes (half of 20).
+	if len(outStdout) > 10 {
+		t.Errorf("stdout should be <= 10 bytes, got %d: %q", len(outStdout), outStdout)
+	}
+	if len(outStderr) > 10 {
+		t.Errorf("stderr should be <= 10 bytes, got %d: %q", len(outStderr), outStderr)
+	}
+}
+
+// --- handleOutput with maxBytes ---
+
+func TestHandleOutput_MaxBytes_Truncates(t *testing.T) {
+	p := newTestProcess("sc-trunc", "trunc-test", StateRunning)
+	// Write enough output to exceed the limit.
+	for i := 0; i < 100; i++ {
+		p.Stdout.Write([]byte(fmt.Sprintf("stdout-line-%03d\n", i)))
+	}
+	p.Stderr.Write([]byte("small-error\n"))
+
+	mock := &mockManager{
+		getFn: func(id string) (*Process, error) { return p, nil },
+	}
+
+	handler := handleOutput(mock, &Config{})
+	req := callToolRequest("output", map[string]any{
+		"id":       "sc-trunc",
+		"maxBytes": float64(200),
+	})
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	var got map[string]any
+	resultJSON(t, result, &got)
+
+	if got["truncated"] != true {
+		t.Error("expected truncated=true")
+	}
+	totalBytes, ok := got["totalBytes"].(float64)
+	if !ok || totalBytes < 200 {
+		t.Errorf("totalBytes = %v, want > 200", got["totalBytes"])
+	}
+
+	stdout := got["stdout"].(string)
+	stderr := got["stderr"].(string)
+	if len(stdout)+len(stderr) > 200 {
+		t.Errorf("combined output = %d bytes, want <= 200", len(stdout)+len(stderr))
+	}
+}
+
+func TestHandleOutput_MaxBytes_NoTruncation(t *testing.T) {
+	p := newTestProcess("sc-notrunc", "notrunc-test", StateRunning)
+	p.Stdout.Write([]byte("short\n"))
+	p.Stderr.Write([]byte("err\n"))
+
+	mock := &mockManager{
+		getFn: func(id string) (*Process, error) { return p, nil },
+	}
+
+	handler := handleOutput(mock, &Config{})
+	req := callToolRequest("output", map[string]any{
+		"id":       "sc-notrunc",
+		"maxBytes": float64(10000),
+	})
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	var got map[string]any
+	resultJSON(t, result, &got)
+
+	if got["truncated"] != nil {
+		t.Errorf("expected no truncated field, got %v", got["truncated"])
+	}
+}
+
+func TestHandleOutput_GlobalMaxOutputSize(t *testing.T) {
+	p := newTestProcess("sc-global", "global-test", StateRunning)
+	for i := 0; i < 100; i++ {
+		p.Stdout.Write([]byte(fmt.Sprintf("line-%03d\n", i)))
+	}
+
+	mock := &mockManager{
+		getFn: func(id string) (*Process, error) { return p, nil },
+	}
+
+	// Global config limit, no per-request maxBytes.
+	handler := handleOutput(mock, &Config{MaxOutputSize: 100})
+	req := callToolRequest("output", map[string]any{"id": "sc-global"})
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	var got map[string]any
+	resultJSON(t, result, &got)
+
+	if got["truncated"] != true {
+		t.Error("expected truncated=true with global MaxOutputSize")
+	}
+}
+
+func TestHandleOutput_GlobalAndRequest_UsesSmaller(t *testing.T) {
+	p := newTestProcess("sc-both", "both-test", StateRunning)
+	for i := 0; i < 100; i++ {
+		p.Stdout.Write([]byte(fmt.Sprintf("line-%03d\n", i)))
+	}
+
+	mock := &mockManager{
+		getFn: func(id string) (*Process, error) { return p, nil },
+	}
+
+	// Global = 500, request = 200 — should use 200.
+	handler := handleOutput(mock, &Config{MaxOutputSize: 500})
+	req := callToolRequest("output", map[string]any{
+		"id":       "sc-both",
+		"maxBytes": float64(200),
+	})
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	var got map[string]any
+	resultJSON(t, result, &got)
+
+	stdout := got["stdout"].(string)
+	stderr := got["stderr"].(string)
+	if len(stdout)+len(stderr) > 200 {
+		t.Errorf("combined output = %d bytes, want <= 200 (smaller of global/request)", len(stdout)+len(stderr))
 	}
 }
