@@ -7,12 +7,12 @@
     "url": "https://github.com/lsequeiraa/mcp-sidecar",
     "source": "github"
   },
-  "version": "0.0.0",
+  "version": "0.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mcp-sidecar",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "transport": {
         "type": "stdio"
       },
@@ -32,6 +32,36 @@
         {
           "name": "SIDECAR_KILL_TIMEOUT",
           "description": "Milliseconds to wait between graceful and forced termination (default: 5000)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_CLEANUP_AFTER",
+          "description": "Seconds before exited processes are auto-removed. 0 disables cleanup (default: 1800)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_MAX_OUTPUT_SIZE",
+          "description": "Global cap on bytes returned by the output tool. 0 means unlimited (default: 0)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_ALLOWED_EXECUTABLES",
+          "description": "Comma-separated allowlist of executable names. When set, enables security mode with direct exec (no shell). Unset means security disabled.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_BLOCKED_PATTERNS",
+          "description": "Comma-separated regex patterns to reject in commands. Only applies when security is enabled.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "SIDECAR_AUDIT_LOG",
+          "description": "Audit log destination. 'true' writes to cwd, 'temp' writes to OS temp dir, or a directory path. Unset disables audit logging.",
           "isRequired": false,
           "format": "string"
         }

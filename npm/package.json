@@ -1,6 +1,6 @@
 {
   "name": "mcp-sidecar",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Cross-platform MCP server for managing background processes",
   "mcpName": "io.github.lsequeiraa/mcp-sidecar",
   "license": "MIT",
