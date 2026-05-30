@@ -12,15 +12,15 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --clean
@@ -30,16 +30,19 @@ jobs:
   npm-publish:
     needs: goreleaser
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "26"
           registry-url: "https://registry.npmjs.org"
 
       - name: Cross-compile binaries
@@ -69,10 +72,28 @@ jobs:
             fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n');
           "
 
+      - name: Stage README and LICENSE for platform packages
+        run: |
+          for dir in npm/@mcp-sidecar/*/; do
+            pkg_name=$(node -p "require('./${dir}package.json').name")
+            cat > "${dir}README.md" <<EOF
+          # ${pkg_name}
+
+          Platform-specific binary for [mcp-sidecar](https://www.npmjs.com/package/mcp-sidecar).
+
+          Do not install this package directly. Install \`mcp-sidecar\` instead, and the
+          correct platform binary will be selected automatically via
+          [\`optionalDependencies\`](https://docs.npmjs.com/cli/v10/configuring-npm/package-json#optionaldependencies).
+
+          Source: https://github.com/lsequeiraa/mcp-sidecar
+          EOF
+            cp LICENSE "${dir}LICENSE"
+          done
+
       - name: Publish platform packages
         run: |
           for dir in npm/@mcp-sidecar/*/; do
-            npm publish "$dir" --access public
+            npm publish "$dir" --access public --provenance
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -83,6 +104,6 @@ jobs:
           cp LICENSE   npm/mcp-sidecar/LICENSE
 
       - name: Publish main package
-        run: npm publish ./npm/mcp-sidecar --access public
+        run: npm publish ./npm/mcp-sidecar --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

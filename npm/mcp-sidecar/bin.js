@@ -29,7 +29,13 @@ try {
   console.error(
     `mcp-sidecar: could not find the binary for ${key}.\n` +
     `The platform package ${entry.pkg} does not appear to be installed.\n` +
-    `Try reinstalling: npm install mcp-sidecar`
+    `\n` +
+    `This usually means npm skipped optional dependencies. Fix it with one of:\n` +
+    `  npm install ${entry.pkg}\n` +
+    `  npm install mcp-sidecar --include=optional\n` +
+    `\n` +
+    `Or download a binary directly from:\n` +
+    `  https://github.com/lsequeiraa/mcp-sidecar/releases`
   );
   process.exit(1);
 }

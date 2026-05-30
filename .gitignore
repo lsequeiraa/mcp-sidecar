@@ -23,6 +23,8 @@ npm/mcp-sidecar/node_modules/
 # Staged by CI before npm publish; sourced from repo root
 npm/mcp-sidecar/README.md
 npm/mcp-sidecar/LICENSE
+npm/@mcp-sidecar/*/README.md
+npm/@mcp-sidecar/*/LICENSE
 
 # GoReleaser
 dist/

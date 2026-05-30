@@ -11,9 +11,6 @@
   "bin": {
     "mcp-sidecar": "./bin.js"
   },
-  "scripts": {
-    "postinstall": "node install.js"
-  },
   "optionalDependencies": {
     "@mcp-sidecar/darwin-arm64": "0.0.0",
     "@mcp-sidecar/darwin-x64": "0.0.0",
@@ -29,7 +26,6 @@
     "sidecar"
   ],
   "files": [
-    "bin.js",
-    "install.js"
+    "bin.js"
   ]
 }
