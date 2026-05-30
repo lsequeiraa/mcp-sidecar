@@ -77,6 +77,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Stage README and LICENSE for npm package
+        run: |
+          cp README.md npm/mcp-sidecar/README.md
+          cp LICENSE   npm/mcp-sidecar/LICENSE
+
       - name: Publish main package
         run: npm publish ./npm/mcp-sidecar --access public
         env:

@@ -20,6 +20,10 @@ npm/@mcp-sidecar/*/bin/
 npm/@mcp-sidecar/win32-x64/mcp-sidecar.exe
 npm/mcp-sidecar/node_modules/
 
+# Staged by CI before npm publish; sourced from repo root
+npm/mcp-sidecar/README.md
+npm/mcp-sidecar/LICENSE
+
 # GoReleaser
 dist/
 
