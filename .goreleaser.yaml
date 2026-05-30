@@ -50,3 +50,6 @@ release:
   github:
     owner: lsequeiraa
     name: mcp-sidecar
+  # Make reruns idempotent: if the GitHub Release already exists, replace its
+  # assets instead of erroring out with HTTP 422 "already_exists".
+  replace_existing_artifacts: true
