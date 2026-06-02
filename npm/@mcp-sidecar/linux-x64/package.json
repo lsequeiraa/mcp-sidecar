@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lsequeiraa/mcp-sidecar"
+    "url": "git+https://github.com/lsequeiraa/mcp-sidecar.git"
   },
   "os": ["linux"],
   "cpu": ["x64"],

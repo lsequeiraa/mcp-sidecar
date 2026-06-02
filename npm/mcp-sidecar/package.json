@@ -6,10 +6,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lsequeiraa/mcp-sidecar"
+    "url": "git+https://github.com/lsequeiraa/mcp-sidecar.git"
   },
   "bin": {
-    "mcp-sidecar": "./bin.js"
+    "mcp-sidecar": "bin.js"
   },
   "optionalDependencies": {
     "@mcp-sidecar/darwin-arm64": "0.0.0",
