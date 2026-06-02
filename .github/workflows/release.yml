@@ -107,3 +107,28 @@ jobs:
         run: npm publish ./npm/mcp-sidecar --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Sync version in .mcp/server.json from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node -e "
+            const fs = require('fs');
+            const p = '.mcp/server.json';
+            const s = JSON.parse(fs.readFileSync(p, 'utf8'));
+            s.version = '${VERSION}';
+            for (const pkg of s.packages || []) { pkg.version = '${VERSION}'; }
+            fs.writeFileSync(p, JSON.stringify(s, null, 2) + '\n');
+          "
+
+      - name: Validate server.json
+        run: ./mcp-publisher validate .mcp/server.json
+
+      - name: Authenticate to MCP Registry (OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish .mcp/server.json

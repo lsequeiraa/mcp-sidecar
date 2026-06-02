@@ -7,12 +7,12 @@
     "url": "https://github.com/lsequeiraa/mcp-sidecar",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mcp-sidecar",
-      "version": "0.1.0",
+      "version": "0.0.0",
       "transport": {
         "type": "stdio"
       },
